@@ -497,3 +497,129 @@ textarea:focus {
     width: 100%;
   }
 }
+
+
+/* TikTact bundle: custom groups, status tabs and compact contact flow */
+
+.stat-button {
+  text-align: left;
+  cursor: pointer;
+}
+
+.stat-button:hover {
+  border-color: #98a2b3;
+}
+
+.status-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin: 0 0 14px;
+  padding-bottom: 2px;
+}
+
+.filter-chip {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 7px 12px;
+  color: #475467;
+  background: #f2f4f7;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.filter-chip.active {
+  color: white;
+  background: #17202a;
+}
+
+.quick-list {
+  display: grid;
+  gap: 8px;
+}
+
+.quick-contact {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #eaecf0;
+}
+
+.quick-contact:last-child {
+  border-bottom: 0;
+}
+
+.quick-contact-main,
+.contact-summary {
+  width: 100%;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  text-align: left;
+}
+
+.quick-contact-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quick-contact-main > span:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.quick-contact-main small {
+  color: #667085;
+}
+
+.compact-grid {
+  grid-template-columns: 1fr;
+}
+
+.compact-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.contact-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
+}
+
+.contact-summary h3 {
+  margin: 0 0 6px;
+}
+
+.contact-expanded {
+  padding: 0 18px 18px;
+  border-top: 1px solid #eaecf0;
+}
+
+.contact-expanded .contact-details {
+  padding-top: 16px;
+}
+
+@media (max-width: 720px) {
+  .quick-contact {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-contact .primary-button {
+    width: 100%;
+  }
+
+  .contact-summary {
+    align-items: flex-start;
+  }
+}
+
