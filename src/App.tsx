@@ -9,6 +9,9 @@ function App() {
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
 
+  const [contactName, setContactName] = useState('')
+  const [contactMessage, setContactMessage] = useState('')
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
@@ -62,6 +65,27 @@ function App() {
     await supabase.auth.signOut()
   }
 
+  async function handleAddContact(event: FormEvent) {
+    event.preventDefault()
+
+    if (!session || !contactName.trim()) return
+
+    setContactMessage('')
+
+    const { error } = await supabase.from('contacts').insert({
+      user_id: session.user.id,
+      name: contactName.trim(),
+    })
+
+    if (error) {
+      setContactMessage(error.message)
+      return
+    }
+
+    setContactName('')
+    setContactMessage('Contact opgeslagen 🎉')
+  }
+
   if (session) {
     return (
       <main>
@@ -70,6 +94,24 @@ function App() {
 
         <h2>Welkom 👋</h2>
         <p>Je bent ingelogd als {session.user.email}</p>
+
+        <h2>Contact toevoegen</h2>
+
+        <form onSubmit={handleAddContact}>
+          <input
+            type="text"
+            placeholder="Naam"
+            value={contactName}
+            onChange={(event) => setContactName(event.target.value)}
+            required
+          />
+
+          <button type="submit">
+            Opslaan
+          </button>
+        </form>
+
+        {contactMessage && <p>{contactMessage}</p>}
 
         <button onClick={handleSignOut}>
           Uitloggen
