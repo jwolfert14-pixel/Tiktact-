@@ -2,6 +2,11 @@ import { FormEvent, useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './supabaseClient'
 
+type Contact = {
+  id: string
+  name: string
+}
+
 function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [email, setEmail] = useState('')
@@ -11,6 +16,7 @@ function App() {
 
   const [contactName, setContactName] = useState('')
   const [contactMessage, setContactMessage] = useState('')
+  const [contacts, setContacts] = useState<Contact[]>([])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -25,6 +31,31 @@ function App() {
       data.subscription.unsubscribe()
     }
   }, [])
+
+  useEffect(() => {
+    if (session) {
+      loadContacts()
+    } else {
+      setContacts([])
+    }
+  }, [session])
+
+  async function loadContacts() {
+    if (!session) return
+
+    const { data, error } = await supabase
+      .from('contacts')
+      .select('id, name')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      setContactMessage(error.message)
+      return
+    }
+
+    setContacts(data ?? [])
+  }
 
   async function handleSignUp(event: FormEvent) {
     event.preventDefault()
@@ -84,6 +115,8 @@ function App() {
 
     setContactName('')
     setContactMessage('Contact opgeslagen 🎉')
+
+    await loadContacts()
   }
 
   if (session) {
@@ -112,6 +145,20 @@ function App() {
         </form>
 
         {contactMessage && <p>{contactMessage}</p>}
+
+        <h2>Mijn contacten</h2>
+
+        {contacts.length === 0 ? (
+          <p>Nog geen contacten.</p>
+        ) : (
+          <ul>
+            {contacts.map((contact) => (
+              <li key={contact.id}>
+                {contact.name}
+              </li>
+            ))}
+          </ul>
+        )}
 
         <button onClick={handleSignOut}>
           Uitloggen
