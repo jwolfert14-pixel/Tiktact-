@@ -30,6 +30,12 @@ function App() {
   const [password, setPassword] = useState('')
   const [authMessage, setAuthMessage] = useState('')
   const [loading, setLoading] = useState(false)
+  const [forgotPassword, setForgotPassword] = useState(false)
+  const [passwordRecovery, setPasswordRecovery] = useState(
+    () => new URLSearchParams(window.location.hash.slice(1)).get('type') === 'recovery'
+  )
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
 
   const [contacts, setContacts] = useState<Contact[]>([])
   const [contactMessage, setContactMessage] = useState('')
@@ -54,17 +60,35 @@ function App() {
   const [sortMode, setSortMode] = useState<'urgency' | 'name'>('urgency')
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const hash = new URLSearchParams(window.location.hash.slice(1))
+    if (hash.has('error')) {
+      setForgotPassword(true)
+      setAuthMessage('Deze herstellink is ongeldig of verlopen. Vraag een nieuwe link aan.')
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    }
+    supabase.auth.getSession().then(({ data, error }) => {
+      setSession(data.session)
+      if (error || !data.session) setPasswordRecovery(false)
+      if (error) {
+        setForgotPassword(true)
+        setAuthMessage('De herstellink kon niet worden geopend. Vraag een nieuwe link aan.')
+      }
+    })
+    const { data } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession)
+      if (event === 'PASSWORD_RECOVERY') {
+        setPasswordRecovery(true)
+        setAuthMessage('')
+      }
+      if (event === 'SIGNED_OUT') setPasswordRecovery(false)
     })
     return () => data.subscription.unsubscribe()
   }, [])
 
   useEffect(() => {
-    if (session) void loadContacts()
+    if (session && !passwordRecovery) void loadContacts()
     else setContacts([])
-  }, [session])
+  }, [session, passwordRecovery])
 
   useEffect(() => {
     if (!formOpen && !selectedContactId) return
@@ -119,6 +143,59 @@ function App() {
 
   async function handleSignOut() {
     await supabase.auth.signOut()
+  }
+
+  async function handlePasswordReset(event: FormEvent) {
+    event.preventDefault()
+    if (loading) return
+    setLoading(true)
+    setAuthMessage('')
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: window.location.origin + window.location.pathname,
+      })
+      setAuthMessage(error
+        ? 'De herstelmail kon niet worden verstuurd. Probeer het later opnieuw.'
+        : 'Als er een account bij dit e-mailadres hoort, ontvang je een herstellink. Controleer ook je spammap.')
+    } catch {
+      setAuthMessage('Geen verbinding. Controleer je internet en probeer opnieuw.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleUpdatePassword(event: FormEvent) {
+    event.preventDefault()
+    if (loading) return
+    if (newPassword.length < 6) {
+      setAuthMessage('Kies een wachtwoord van minimaal 6 tekens.')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setAuthMessage('De wachtwoorden komen niet overeen.')
+      return
+    }
+    setLoading(true)
+    setAuthMessage('')
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      if (error) {
+        setAuthMessage(`Wachtwoord niet gewijzigd: ${error.message}`)
+        return
+      }
+      await supabase.auth.signOut({ scope: 'local' })
+      setSession(null)
+      setPasswordRecovery(false)
+      setForgotPassword(false)
+      setPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      setAuthMessage('Je wachtwoord is gewijzigd. Je kunt nu inloggen met je nieuwe wachtwoord.')
+    } catch {
+      setAuthMessage('Geen verbinding. Controleer je internet en probeer opnieuw.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   function todayString(date = new Date()) {
@@ -396,7 +473,7 @@ function App() {
 
   const selectedContact = contacts.find((c) => c.id === selectedContactId) ?? null
 
-  if (!session) {
+  if (!session || passwordRecovery) {
     return (
       <main className="auth-page">
         <section className="auth-card">
@@ -405,6 +482,29 @@ function App() {
             <p>Blijf in contact met de mensen die ertoe doen.</p>
           </div>
 
+          {passwordRecovery ? (
+            <form className="form-stack" onSubmit={handleUpdatePassword}>
+              <h2>Nieuw wachtwoord</h2>
+              <label>Nieuw wachtwoord
+                <input type="password" autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} minLength={6} required />
+              </label>
+              <label>Herhaal nieuw wachtwoord
+                <input type="password" autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} minLength={6} required />
+              </label>
+              <button className="primary-button" type="submit" disabled={loading}>{loading ? 'Opslaan...' : 'Wachtwoord opslaan'}</button>
+              <button className="text-button" type="button" disabled={loading} onClick={() => void handleSignOut()}>Annuleren</button>
+            </form>
+          ) : forgotPassword ? (
+            <form className="form-stack" onSubmit={handlePasswordReset}>
+              <h2>Wachtwoord vergeten?</h2>
+              <p>Vul je e-mailadres in. Je ontvangt een link om een nieuw wachtwoord te kiezen.</p>
+              <label>E-mailadres
+                <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              </label>
+              <button className="primary-button" type="submit" disabled={loading}>{loading ? 'Versturen...' : 'Herstellink versturen'}</button>
+              <button className="text-button" type="button" disabled={loading} onClick={() => { setForgotPassword(false); setAuthMessage('') }}>Terug naar inloggen</button>
+            </form>
+          ) : (
           <form className="form-stack" onSubmit={handleSignUp}>
             <label>
               E-mailadres
@@ -415,10 +515,12 @@ function App() {
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={6} required />
             </label>
             <button className="primary-button" type="button" onClick={handleSignIn} disabled={loading}>Inloggen</button>
+            <button className="text-button" type="button" disabled={loading} onClick={() => { setForgotPassword(true); setPassword(''); setAuthMessage('') }}>Wachtwoord vergeten?</button>
             <button className="secondary-button" type="submit" disabled={loading}>Account aanmaken</button>
           </form>
+          )}
 
-          {authMessage && <p className="feedback">{authMessage}</p>}
+          {authMessage && <p className="feedback" role="status">{authMessage}</p>}
         </section>
       </main>
     )
